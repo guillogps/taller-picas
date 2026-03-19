@@ -65,3 +65,61 @@
           - "Versión detectada: RHEL {{ ansible_distribution_major_version }}"
           - "Arquitectura: {{ ansible_architecture }}"
           - "Estado SSHD: {{ ansible_facts.services['sshd.service'].state }}"
+-----
+---
+- name: Configuración de Usuario según Versión de RHEL
+  hosts: all
+  gather_facts: yes
+  become: yes  # Requerido para crear usuarios y manejar privilegios
+
+  tasks:
+    # ---------------------------------------------------------
+    # CONFIGURACIÓN PARA RHEL 8
+    # ---------------------------------------------------------
+    - name: "Bloque de tareas para RHEL 8"
+      when: ansible_distribution_major_version == "8"
+      block:
+        - name: RHEL 8 - Crear usuario 'ecuador' con perfil estándar
+          ansible.builtin.user:
+            name: ecuador
+            comment: "Usuario Ecuador - RHEL 8"
+            shell: /bin/bash
+            groups: wheel  # Permisos de sudo en RHEL
+            state: present
+        
+        - name: RHEL 8 - Confirmación de creación
+          ansible.builtin.debug:
+            msg: "Se ha creado el usuario 'ecuador' bajo el estándar de RHEL 8."
+
+    # ---------------------------------------------------------
+    # CONFIGURACIÓN PARA RHEL 9
+    # ---------------------------------------------------------
+    - name: "Bloque de tareas para RHEL 9"
+      when: ansible_distribution_major_version == "9"
+      block:
+        - name: RHEL 9 - Crear usuario 'ecuador' con seguridad reforzada
+          ansible.builtin.user:
+            name: ecuador
+            comment: "Usuario Ecuador - RHEL 9"
+            shell: /bin/bash
+            groups: wheel
+            # En RHEL 9 podrías requerir expiración de clave o atributos específicos
+            password_expire_max: 90
+            state: present
+
+        - name: RHEL 9 - Confirmación de creación
+          ansible.builtin.debug:
+            msg: "Se ha creado el usuario 'ecuador' siguiendo políticas de RHEL 9."
+
+    # ---------------------------------------------------------
+    # VERIFICACIÓN FINAL (Común para ambos)
+    # ---------------------------------------------------------
+    - name: Verificar existencia del usuario en el sistema
+      ansible.builtin.getent:
+        database: passwd
+        key: ecuador
+      register: user_exists
+
+    - name: Mostrar detalles del usuario creado
+      ansible.builtin.debug:
+        var: user_exists.ansible_facts.getent_passwd.ecuador
