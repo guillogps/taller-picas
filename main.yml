@@ -64,8 +64,7 @@
           - "Versión detectada: RHEL {{ ansible_distribution_major_version }}"
           - "Arquitectura: {{ ansible_architecture }}"
           - "Estado SSHD: {{ ansible_facts.services['sshd.service'].state }}"
------
----
+
 - name: Configuración de Usuario según Versión de RHEL
   hosts: all
   gather_facts: yes
