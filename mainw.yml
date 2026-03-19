@@ -1,1 +1,83 @@
+---
+- name: Validar credenciales, revisar CPU, servicios, usuario local y actualizar Windows
+  hosts: os_windows
+  gather_facts: no
 
+  vars:
+    cpu_threshold: 80
+
+    # Usuario local a crear
+    local_user_name: "ecuador"
+    local_user_password: "CambiarPorUnaClaveSegura123!"
+
+    # Servicios a validar
+    servicios_criticos:
+      - WinRM
+      - wuauserv
+      - LanmanServer
+      - EventLog
+
+  tasks:
+    - name: Validar conectividad y credenciales por WinRM
+      ansible.windows.win_ping:
+
+    - name: Obtener hostname remoto
+      ansible.windows.win_command: hostname
+      register: hostname_result
+
+    - name: Mostrar hostname remoto
+      ansible.builtin.debug:
+        msg: "Conectividad OK con {{ inventory_hostname }}. Host remoto: {{ hostname_result.stdout }}"
+
+    - name: Obtener porcentaje de uso de CPU
+      ansible.windows.win_shell: |
+        $cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
+        [math]::Round($cpu,2)
+      register: cpu_result
+
+    - name: Mostrar uso de CPU
+      ansible.builtin.debug:
+        msg: "Servidor {{ inventory_hostname }} - Uso actual de CPU: {{ cpu_result.stdout }} %"
+
+    - name: Alertar si CPU supera el umbral
+      ansible.builtin.debug:
+        msg: "ALERTA: CPU alta en {{ inventory_hostname }}: {{ cpu_result.stdout }} %"
+      when: (cpu_result.stdout | float) > cpu_threshold
+
+    - name: Revisar estado de servicios críticos
+      ansible.windows.win_service:
+        name: "{{ item }}"
+      loop: "{{ servicios_criticos }}"
+      register: estado_servicios
+
+    - name: Mostrar estado de servicios
+      ansible.builtin.debug:
+        msg: "Servicio {{ item.name }} - Estado: {{ item.state }} - Inicio: {{ item.start_mode }}"
+      loop: "{{ estado_servicios.results }}"
+
+    - name: Crear usuario local ecuador
+      ansible.windows.win_user:
+        name: "{{ local_user_name }}"
+        password: "{{ local_user_password }}"
+        state: present
+        password_never_expires: true
+        user_cannot_change_password: false
+        groups:
+          - Users
+
+    - name: Confirmar creación del usuario local
+      ansible.builtin.debug:
+        msg: "Usuario local {{ local_user_name }} validado/creado en {{ inventory_hostname }}"
+
+    - name: Instalar actualizaciones críticas y de seguridad
+      ansible.windows.win_updates:
+        category_names:
+          - CriticalUpdates
+          - SecurityUpdates
+          - UpdateRollups
+        reboot: true
+      register: update_result
+
+    - name: Mostrar resultado de actualizaciones
+      ansible.builtin.debug:
+        var: update_result
