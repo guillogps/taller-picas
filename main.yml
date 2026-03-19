@@ -1,2 +1,67 @@
 
 --
+---
+- name: Verificación de Servicios SSHD y HTTPD en Red Hat Enterprise Linux
+  hosts: all
+  gather_facts: yes
+  become: yes  # Necesario para consultar estados de servicios protegidos
+
+  tasks:
+    # ---------------------------------------------------------
+    # BLOQUE DE VALIDACIÓN PARA RHEL 8
+    # ---------------------------------------------------------
+    - name: "RHEL 8: Validar servicios"
+      when: ansible_distribution_major_version == "8"
+      block:
+        - name: RHEL 8 - Consultar estado de SSHD
+          ansible.builtin.service_facts:
+
+        - name: RHEL 8 - Verificar que SSHD esté corriendo
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.services['sshd.service'].state == 'running'
+            fail_msg: "¡ERROR! SSHD no está en ejecución en este servidor RHEL 8."
+            success_msg: "OK: SSHD operativo en RHEL 8."
+
+        - name: RHEL 8 - Verificar que HTTPD esté corriendo
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.services['httpd.service'].state == 'running'
+            fail_msg: "¡ALERTA! El servicio Web (HTTPD) está detenido en RHEL 8."
+            success_msg: "OK: HTTPD operativo en RHEL 8."
+          ignore_errors: yes # Útil si HTTPD es opcional en algunos nodos
+
+    # ---------------------------------------------------------
+    # BLOQUE DE VALIDACIÓN PARA RHEL 9
+    # ---------------------------------------------------------
+    - name: "RHEL 9: Validar servicios"
+      when: ansible_distribution_major_version == "9"
+      block:
+        - name: RHEL 9 - Consultar estado de servicios
+          ansible.builtin.service_facts:
+
+        - name: RHEL 9 - Validar SSHD (Estricto)
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.services['sshd.service'].state == 'running'
+              - ansible_facts.services['sshd.service'].status == 'enabled'
+            fail_msg: "CRÍTICO: SSHD no está activo o no está habilitado en el arranque de RHEL 9."
+            success_msg: "PASS: SSHD cumple con los estándares de RHEL 9."
+
+        - name: RHEL 9 - Validar HTTPD
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.services['httpd.service'].state == 'running'
+            fail_msg: "¡ALERTA! HTTPD caído en RHEL 9."
+            success_msg: "PASS: HTTPD operativo en RHEL 9."
+
+    # ---------------------------------------------------------
+    # REPORTE FINAL CONSOLIDADO
+    # ---------------------------------------------------------
+    - name: Mostrar resumen del sistema validado
+      ansible.builtin.debug:
+        msg: 
+          - "Host: {{ inventory_hostname }}"
+          - "Versión detectada: RHEL {{ ansible_distribution_major_version }}"
+          - "Arquitectura: {{ ansible_architecture }}"
+          - "Estado SSHD: {{ ansible_facts.services['sshd.service'].state }}"
