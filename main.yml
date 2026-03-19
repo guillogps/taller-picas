@@ -1,5 +1,4 @@
 
---
 ---
 - name: Verificación de Servicios SSHD y HTTPD en Red Hat Enterprise Linux
   hosts: all
